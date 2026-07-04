@@ -9,6 +9,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -27,9 +28,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var splashView: FrameLayout
     private lateinit var rootLayout: FrameLayout
     private lateinit var shareButton: AppCompatButton
+    private lateinit var fullscreenContainer: FrameLayout
 
     private val handler = Handler(Looper.getMainLooper())
     private var splashHidden = false
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,11 +74,42 @@ class MainActivity : AppCompatActivity() {
         settings.allowContentAccess = true
         settings.userAgentString = "Mozilla/5.0 (Linux; Android 11; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                customView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+                view?.let { v ->
+                    v.setBackgroundColor(Color.BLACK)
+                    fullscreenContainer.addView(v, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                    fullscreenContainer.visibility = View.VISIBLE
+                    fullscreenContainer.bringToFront()
+                    webView.visibility = View.GONE
+                    shareButton.visibility = View.GONE
+                }
+                customView = view
+                customViewCallback = callback
+                setupImmersiveMode()
+            }
+
+            override fun onHideCustomView() {
+                customView?.let {
+                    (it.parent as? ViewGroup)?.removeView(it)
+                }
+                fullscreenContainer.visibility = View.GONE
+                webView.visibility = View.VISIBLE
+                shareButton.visibility = View.VISIBLE
+                customView = null
+                customViewCallback?.onCustomViewHidden()
+                customViewCallback = null
+                setupImmersiveMode()
+            }
+        }
+
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                // Hide share button with fade
                 ObjectAnimator.ofFloat(shareButton, "alpha", shareButton.alpha, 0f).apply {
                     duration = 200
                     start()
@@ -88,6 +123,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.loadUrl("https://famelack.com/tv/uk")
+
+        // Add fullscreen container for video
+        fullscreenContainer = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(Color.BLACK)
+            keepScreenOn = true
+            visibility = View.GONE
+        }
+        rootLayout.addView(fullscreenContainer)
     }
 
     private fun hideSplash() {
@@ -111,14 +158,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupShareButton() {
         val density = resources.displayMetrics.density
-        val size = (48 * density).toInt()
+        val size = (56 * density).toInt()
         val margin = (16 * density).toInt()
 
         shareButton = AppCompatButton(this).apply {
-            text = "📤"
-            setBackgroundColor(Color.parseColor("#4464D2FF"))
+            text = "Send to TV"
+            setBackgroundColor(Color.parseColor("#664DABFF"))
             setTextColor(Color.WHITE)
-            textSize = 18f
+            textSize = 14f
+            isFocusable = true
+            isFocusableInTouchMode = true
             layoutParams = FrameLayout.LayoutParams(size, size).apply {
                 gravity = Gravity.BOTTOM or Gravity.END
                 setMargins(margin, margin, margin, margin)
@@ -126,6 +175,13 @@ class MainActivity : AppCompatActivity() {
             visibility = View.INVISIBLE
             alpha = 0f
             setOnClickListener { shareCurrentUrl() }
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
+                } else {
+                    animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                }
+            }
         }
         rootLayout.addView(shareButton)
     }
@@ -137,7 +193,7 @@ class MainActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_TEXT, url)
             putExtra(Intent.EXTRA_SUBJECT, "Famelack TV")
         }
-        startActivity(Intent.createChooser(shareIntent, "Share Famelack TV"))
+        startActivity(Intent.createChooser(shareIntent, "Send to TV"))
     }
 
     private fun setupImmersiveMode() {
@@ -181,7 +237,9 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
             KeyEvent.KEYCODE_BACK -> {
-                if (webView.canGoBack()) {
+                if (customView != null) {
+                    onHideCustomView()
+                } else if (webView.canGoBack()) {
                     webView.goBack()
                 } else {
                     moveTaskToBack(true)
@@ -190,6 +248,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    private fun onHideCustomView() {
+        customView?.let {
+            (it.parent as? ViewGroup)?.removeView(it)
+        }
+        fullscreenContainer.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+        shareButton.visibility = View.VISIBLE
+        customView = null
+        customViewCallback?.onCustomViewHidden()
+        customViewCallback = null
+        setupImmersiveMode()
     }
 
     private fun injectClickOnFocusedElement() {
