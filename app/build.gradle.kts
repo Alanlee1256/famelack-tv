@@ -38,4 +38,6 @@ dependencies {
     implementation("androidx.webkit:webkit:1.9.0")
     implementation("androidx.leanback:leanback:1.0.0")
     implementation("androidx.tvprovider:tvprovider:1.0.0")
+    implementation("com.google.android.gms:play-services-cast-framework:21.5.0")
+    implementation("com.google.android.gms:play-services-cast:21.5.0")
 }

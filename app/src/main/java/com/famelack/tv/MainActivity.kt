@@ -24,6 +24,11 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManager
+import com.google.android.gms.cast.framework.SessionManagerListener
+import androidx.mediarouter.app.MediaRouteButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -37,6 +42,9 @@ class MainActivity : AppCompatActivity() {
     private var splashHidden = false
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var castSession: CastSession? = null
+    private lateinit var sessionManager: SessionManager
+    private lateinit var castButton: MediaRouteButton
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         setupWebView()
         setupShareButton()
         setupImmersiveMode()
+        setupCastButton()
 
         handler.postDelayed({ hideSplash() }, 2000)
     }
@@ -117,34 +126,32 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 hideSplash()
-                // Force enable Video.js fullscreen control
                 view?.evaluateJavascript("""
                     (function(){
                         try {
-                            function enableFS() {
-                                var videos = document.querySelectorAll('video');
-                                for(var i=0;i<videos.length;i++){
-                                    var v=videos[i];
-                                    v.setAttribute('controls','');
-                                    v.setAttribute('playsinline','');
-                                    v.setAttribute('webkit-playsinline','');
-                                    v.style.width='100%'; v.style.height='100%';
-                                }
-                                if(window.videojs && window.videojs.players){
-                                    var keys=Object.keys(window.videojs.players);
-                                    for(var k=0;k<keys.length;k++){
-                                        var p=window.videojs.players[keys[k]];
-                                        if(p && p.controlBar && p.controlBar.fullscreenToggle){
-                                            p.controlBar.fullscreenToggle.show();
-                                            p.controlBar.fullscreenToggle.enable();
-                                        }
-                                        if(p) p.controls(true);
+                            function addFsBtn() {
+                                var video = document.querySelector('video');
+                                if(!video || document.getElementById('__ftv_fs_btn')) return;
+                                var fsBtn = document.createElement('div');
+                                fsBtn.id = '__ftv_fs_btn';
+                                fsBtn.innerHTML = '⛶';
+                                fsBtn.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:99999;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.3);color:white;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(4px);border:2px solid rgba(255,255,255,0.5);';
+                                fsBtn.onclick = function(e){
+                                    e.stopPropagation();
+                                    var v = document.querySelector('video');
+                                    if(v) {
+                                        if(v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+                                        else if(v.requestFullscreen) v.requestFullscreen();
                                     }
-                                }
+                                };
+                                document.body.appendChild(fsBtn);
+                                var obs = new MutationObserver(function(){
+                                    var v = document.querySelector('video');
+                                    fsBtn.style.display = v ? 'flex' : 'none';
+                                });
+                                obs.observe(document.body, {childList:true, subtree:true});
                             }
-                            enableFS();
-                            setTimeout(enableFS,2000);
-                            setTimeout(enableFS,5000);
+                            addFsBtn();
                         } catch(e){}
                     })();
                 """.trimIndent(), null)
@@ -208,6 +215,31 @@ class MainActivity : AppCompatActivity() {
             }
         }
         rootLayout.addView(shareButton)
+    }
+
+    private fun setupCastButton() {
+        castButton = MediaRouteButton(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END
+            ).apply { setMargins(0, (60 * resources.displayMetrics.density).toInt(), (16 * resources.displayMetrics.density).toInt(), 0) }
+        }
+        rootLayout.addView(castButton)
+        CastContext.getSharedInstance(this).sessionManager.also {
+            sessionManager = it
+            it.addSessionManagerListener(object : SessionManagerListener<CastSession> {
+                override fun onSessionEnded(session: CastSession?, error: Int) { castSession = null }
+                override fun onSessionResumed(session: CastSession?, wasSuspended: Boolean) { castSession = session }
+                override fun onSessionStarted(session: CastSession?, sessionId: String) { castSession = session }
+                override fun onSessionStarting(session: CastSession?) {}
+                override fun onSessionStartFailed(session: CastSession?, error: Int) {}
+                override fun onSessionEnding(session: CastSession?) {}
+                override fun onSessionResuming(session: CastSession?, sessionId: String) {}
+                override fun onSessionResumeFailed(session: CastSession?, error: Int) {}
+                override fun onSessionSuspended(session: CastSession?, reason: Int) {}
+            })
+        }
     }
 
     private fun shareCurrentUrl() {
