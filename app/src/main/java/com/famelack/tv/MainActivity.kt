@@ -229,7 +229,15 @@ class MainActivity : AppCompatActivity() {
         CastContext.getSharedInstance(this).sessionManager.also {
             sessionManager = it
             it.addSessionManagerListener(object : SessionManagerListener<CastSession> {
+                override fun onSessionEnded(session: CastSession, error: Int) {}
                 override fun onSessionEnding(session: CastSession) {}
+                override fun onSessionStarted(session: CastSession, sessionId: String) { castSession = session }
+                override fun onSessionStarting(session: CastSession) {}
+                override fun onSessionStartFailed(session: CastSession, error: Int) {}
+                override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) { castSession = session }
+                override fun onSessionResuming(session: CastSession, sessionId: String) {}
+                override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+                override fun onSessionSuspended(session: CastSession, reason: Int) {}
             })
         }
     }
