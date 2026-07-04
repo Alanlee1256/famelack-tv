@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity() {
 
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: View?, url: String?, favicon: android.graphics.Bitmap?) {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 // Hide share button with fade
                 ObjectAnimator.ofFloat(shareButton, "alpha", shareButton.alpha, 0f).apply {
@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onPageFinished(view: View?, url: String?) {
+            override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 hideSplash()
             }
