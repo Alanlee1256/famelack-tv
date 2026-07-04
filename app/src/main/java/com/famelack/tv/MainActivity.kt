@@ -26,6 +26,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManager
 import com.google.android.gms.cast.framework.SessionManagerListener
 import androidx.mediarouter.app.MediaRouteButton
@@ -228,16 +229,22 @@ class MainActivity : AppCompatActivity() {
         rootLayout.addView(castButton)
         CastContext.getSharedInstance(this).sessionManager.also {
             sessionManager = it
-            it.addSessionManagerListener(object : SessionManagerListener<CastSession> {
-                override fun onSessionEnded(session: CastSession, error: Int) {}
-                override fun onSessionEnding(session: CastSession) {}
-                override fun onSessionStarted(session: CastSession, sessionId: String) { castSession = session }
-                override fun onSessionStarting(session: CastSession) {}
-                override fun onSessionStartFailed(session: CastSession, error: Int) {}
-                override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) { castSession = session }
-                override fun onSessionResuming(session: CastSession, sessionId: String) {}
-                override fun onSessionResumeFailed(session: CastSession, error: Int) {}
-                override fun onSessionSuspended(session: CastSession, reason: Int) {}
+            it.addSessionManagerListener(object : SessionManagerListener<Session> {
+                override fun onSessionEnded(session: Session, error: Int) {
+                    castSession = session as? CastSession
+                }
+                override fun onSessionEnding(session: Session) {}
+                override fun onSessionStarted(session: Session, sessionId: String) {
+                    castSession = session as? CastSession
+                }
+                override fun onSessionStarting(session: Session) {}
+                override fun onSessionStartFailed(session: Session, error: Int) {}
+                override fun onSessionResumed(session: Session, wasSuspended: Boolean) {
+                    castSession = session as? CastSession
+                }
+                override fun onSessionResuming(session: Session, sessionId: String) {}
+                override fun onSessionResumeFailed(session: Session, error: Int) {}
+                override fun onSessionSuspended(session: Session, reason: Int) {}
             })
         }
     }
