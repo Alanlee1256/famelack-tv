@@ -1,6 +1,7 @@
 package com.famelack.tv
 
 import android.animation.ObjectAnimator
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -11,6 +12,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -47,32 +50,30 @@ class MainActivity : AppCompatActivity() {
         setupShareButton()
         setupImmersiveMode()
 
-        // Backup timer to auto-hide splash after 2 seconds
-        handler.postDelayed({
-            hideSplash()
-        }, 2000)
+        handler.postDelayed({ hideSplash() }, 2000)
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
 
-        val settings = webView.settings
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.mediaPlaybackRequiresUserGesture = false
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        settings.displayZoomControls = false
-        settings.builtInZoomControls = false
-        settings.loadWithOverviewMode = true
-        settings.useWideViewPort = true
-        settings.cacheMode = WebSettings.LOAD_DEFAULT
-        settings.databaseEnabled = true
-        settings.allowFileAccess = true
-        settings.allowContentAccess = true
-        settings.userAgentString = "Mozilla/5.0 (Linux; Android 11; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        val s = webView.settings
+        s.javaScriptEnabled = true
+        s.domStorageEnabled = true
+        s.mediaPlaybackRequiresUserGesture = false
+        s.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        s.displayZoomControls = false
+        s.builtInZoomControls = false
+        s.loadWithOverviewMode = true
+        s.useWideViewPort = true
+        s.cacheMode = WebSettings.LOAD_DEFAULT
+        s.databaseEnabled = true
+        s.allowFileAccess = true
+        s.allowContentAccess = true
+        s.userAgentString = "Mozilla/5.0 (Linux; Android 11; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
@@ -80,8 +81,7 @@ class MainActivity : AppCompatActivity() {
                 view?.let { v ->
                     v.setBackgroundColor(Color.BLACK)
                     fullscreenContainer.addView(v, FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
+                        FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
                     ))
                     fullscreenContainer.visibility = View.VISIBLE
                     fullscreenContainer.bringToFront()
@@ -94,9 +94,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onHideCustomView() {
-                customView?.let {
-                    (it.parent as? ViewGroup)?.removeView(it)
-                }
+                customView?.let { (it.parent as? ViewGroup)?.removeView(it) }
                 fullscreenContainer.visibility = View.GONE
                 webView.visibility = View.VISIBLE
                 shareButton.visibility = View.VISIBLE
@@ -119,16 +117,45 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 hideSplash()
+                // Force enable Video.js fullscreen control
+                view?.evaluateJavascript("""
+                    (function(){
+                        try {
+                            function enableFS() {
+                                var videos = document.querySelectorAll('video');
+                                for(var i=0;i<videos.length;i++){
+                                    var v=videos[i];
+                                    v.setAttribute('controls','');
+                                    v.setAttribute('playsinline','');
+                                    v.setAttribute('webkit-playsinline','');
+                                    v.style.width='100%'; v.style.height='100%';
+                                }
+                                if(window.videojs && window.videojs.players){
+                                    var keys=Object.keys(window.videojs.players);
+                                    for(var k=0;k<keys.length;k++){
+                                        var p=window.videojs.players[keys[k]];
+                                        if(p && p.controlBar && p.controlBar.fullscreenToggle){
+                                            p.controlBar.fullscreenToggle.show();
+                                            p.controlBar.fullscreenToggle.enable();
+                                        }
+                                        if(p) p.controls(true);
+                                    }
+                                }
+                            }
+                            enableFS();
+                            setTimeout(enableFS,2000);
+                            setTimeout(enableFS,5000);
+                        } catch(e){}
+                    })();
+                """.trimIndent(), null)
             }
         }
 
         webView.loadUrl("https://famelack.com/tv/uk")
 
-        // Add fullscreen container for video
         fullscreenContainer = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
             )
             setBackgroundColor(Color.BLACK)
             keepScreenOn = true
@@ -140,12 +167,12 @@ class MainActivity : AppCompatActivity() {
     private fun hideSplash() {
         if (splashHidden) return
         splashHidden = true
-        val animator = ObjectAnimator.ofFloat(splashView, "alpha", 1f, 0f)
-        animator.duration = 500
-        animator.start()
+        ObjectAnimator.ofFloat(splashView, "alpha", 1f, 0f).apply {
+            duration = 500
+            start()
+        }
         handler.postDelayed({
             splashView.visibility = View.GONE
-            // 1 second after splash is removed, fade in share button
             handler.postDelayed({
                 shareButton.visibility = View.VISIBLE
                 ObjectAnimator.ofFloat(shareButton, "alpha", 0f, 1f).apply {
@@ -157,9 +184,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupShareButton() {
-        val density = resources.displayMetrics.density
-        val size = (56 * density).toInt()
-        val margin = (16 * density).toInt()
+        val d = resources.displayMetrics.density
+        val size = (56 * d).toInt()
+        val margin = (16 * d).toInt()
 
         shareButton = AppCompatButton(this).apply {
             text = "Send to TV"
@@ -176,84 +203,76 @@ class MainActivity : AppCompatActivity() {
             alpha = 0f
             setOnClickListener { shareCurrentUrl() }
             setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
-                } else {
-                    animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                }
+                if (hasFocus) animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
+                else animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
             }
         }
         rootLayout.addView(shareButton)
     }
 
     private fun shareCurrentUrl() {
-        val url = webView.url ?: "https://famelack.com/tv/uk"
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, url)
-            putExtra(Intent.EXTRA_SUBJECT, "Famelack TV")
+        webView.evaluateJavascript("""
+            (function(){
+                try {
+                    if(window.videojs){
+                        var players=document.querySelectorAll('.video-js');
+                        for(var i=0;i<players.length;i++){
+                            var p=players[i];
+                            if(p.player){ var src=p.player.currentSrc()||p.player.src(); if(src) return src; }
+                        }
+                    }
+                    var v=document.querySelector('video');
+                    if(v) return v.currentSrc||v.src||'';
+                    var sources=document.querySelectorAll('video source');
+                    for(var i=0;i<sources.length;i++){ if(sources[i].src) return sources[i].src; }
+                } catch(e){}
+                return '';
+            })();
+        """.trimIndent()) { result ->
+            val videoUrl = result?.trim('"')?.trim('\'') ?: ""
+            val shareUrl = videoUrl.ifBlank { webView.url ?: "https://famelack.com/tv/uk" }
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, shareUrl)
+                putExtra(Intent.EXTRA_SUBJECT, "Famelack TV")
+            }
+            startActivity(Intent.createChooser(shareIntent, "Send to TV"))
         }
-        startActivity(Intent.createChooser(shareIntent, "Send to TV"))
     }
 
     private fun setupImmersiveMode() {
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        )
+        val ctrl = WindowCompat.getInsetsController(window, window.decorView)
+        ctrl.hide(WindowInsetsCompat.Type.systemBars())
+        ctrl.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                webView.scrollBy(0, -60)
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                webView.scrollBy(0, 60)
-                return true
-            }
+            KeyEvent.KEYCODE_DPAD_UP -> { webView.scrollBy(0, -60); return true }
+            KeyEvent.KEYCODE_DPAD_DOWN -> { webView.scrollBy(0, 60); return true }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (shareButton.hasFocus()) {
-                    webView.requestFocus()
-                } else {
-                    webView.scrollBy(-60, 0)
-                }
+                if (shareButton.hasFocus()) webView.requestFocus()
+                else webView.scrollBy(-60, 0)
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                webView.scrollBy(60, 0)
-                return true
-            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { webView.scrollBy(60, 0); return true }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
-                injectClickOnFocusedElement()
-                return true
+                injectClick(); return true
             }
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                injectClickOnVideoElement()
-                return true
-            }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { injectVideoClick(); return true }
             KeyEvent.KEYCODE_BACK -> {
-                if (customView != null) {
-                    onHideCustomView()
-                } else if (webView.canGoBack()) {
-                    webView.goBack()
-                } else {
-                    moveTaskToBack(true)
-                }
+                if (customView != null) { hideCustomView() }
+                else if (webView.canGoBack()) { webView.goBack() }
+                else { moveTaskToBack(true) }
                 return true
             }
         }
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun onHideCustomView() {
-        customView?.let {
-            (it.parent as? ViewGroup)?.removeView(it)
-        }
+    private fun hideCustomView() {
+        customView?.let { (it.parent as? ViewGroup)?.removeView(it) }
         fullscreenContainer.visibility = View.GONE
         webView.visibility = View.VISIBLE
         shareButton.visibility = View.VISIBLE
@@ -263,37 +282,27 @@ class MainActivity : AppCompatActivity() {
         setupImmersiveMode()
     }
 
-    private fun injectClickOnFocusedElement() {
-        val js = """
-            (function() {
-                var el = document.activeElement;
-                if (el && (el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT' || el.tagName === 'VIDEO')) {
-                    el.click();
-                }
+    private fun injectClick() {
+        webView.evaluateJavascript("""
+            (function(){
+                var el=document.activeElement;
+                if(el&&(el.tagName==='BUTTON'||el.tagName==='A'||el.tagName==='INPUT'||el.tagName==='VIDEO')) el.click();
             })();
-        """.trimIndent()
-        webView.evaluateJavascript(js, null)
+        """.trimIndent(), null)
     }
 
-    private fun injectClickOnVideoElement() {
-        val js = """
-            (function() {
-                var el = document.activeElement;
-                if (el && el.tagName === 'VIDEO') {
-                    el.click();
-                } else {
-                    var v = document.querySelector('video');
-                    if (v) { v.click(); }
-                }
+    private fun injectVideoClick() {
+        webView.evaluateJavascript("""
+            (function(){
+                var el=document.activeElement;
+                if(el&&el.tagName==='VIDEO') el.click();
+                else{ var v=document.querySelector('video'); if(v) v.click(); }
             })();
-        """.trimIndent()
-        webView.evaluateJavascript(js, null)
+        """.trimIndent(), null)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            setupImmersiveMode()
-        }
+        if (hasFocus) setupImmersiveMode()
     }
 }
