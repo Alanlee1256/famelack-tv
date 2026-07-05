@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
@@ -227,25 +227,29 @@ class MainActivity : AppCompatActivity() {
             ).apply { setMargins(0, (60 * resources.displayMetrics.density).toInt(), (16 * resources.displayMetrics.density).toInt(), 0) }
         }
         rootLayout.addView(castButton)
-        CastContext.getSharedInstance(this).sessionManager.also {
-            sessionManager = it
-            it.addSessionManagerListener(object : SessionManagerListener<Session> {
-                override fun onSessionEnded(session: Session, error: Int) {
-                    castSession = session as? CastSession
-                }
-                override fun onSessionEnding(session: Session) {}
-                override fun onSessionStarted(session: Session, sessionId: String) {
-                    castSession = session as? CastSession
-                }
-                override fun onSessionStarting(session: Session) {}
-                override fun onSessionStartFailed(session: Session, error: Int) {}
-                override fun onSessionResumed(session: Session, wasSuspended: Boolean) {
-                    castSession = session as? CastSession
-                }
-                override fun onSessionResuming(session: Session, sessionId: String) {}
-                override fun onSessionResumeFailed(session: Session, error: Int) {}
-                override fun onSessionSuspended(session: Session, reason: Int) {}
-            })
+        try {
+            CastContext.getSharedInstance(this).sessionManager.also {
+                sessionManager = it
+                it.addSessionManagerListener(object : SessionManagerListener<Session> {
+                    override fun onSessionEnded(session: Session, error: Int) {
+                        castSession = session as? CastSession
+                    }
+                    override fun onSessionEnding(session: Session) {}
+                    override fun onSessionStarted(session: Session, sessionId: String) {
+                        castSession = session as? CastSession
+                    }
+                    override fun onSessionStarting(session: Session) {}
+                    override fun onSessionStartFailed(session: Session, error: Int) {}
+                    override fun onSessionResumed(session: Session, wasSuspended: Boolean) {
+                        castSession = session as? CastSession
+                    }
+                    override fun onSessionResuming(session: Session, sessionId: String) {}
+                    override fun onSessionResumeFailed(session: Session, error: Int) {}
+                    override fun onSessionSuspended(session: Session, reason: Int) {}
+                })
+            }
+        } catch (e: Exception) {
+            // Google Play Services not available (e.g. Fire TV) — Cast features disabled
         }
     }
 
