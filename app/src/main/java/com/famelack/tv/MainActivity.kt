@@ -47,6 +47,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sessionManager: SessionManager
     private lateinit var castButton: MediaRouteButton
 
+    private inner class VideoStateInterface {
+        @android.webkit.JavascriptInterface
+        fun onVideoPlaying() {
+            handler.post {
+                castButton.animate().alpha(0f).setDuration(200).withEndAction { castButton.visibility = View.GONE }.start()
+                shareButton.animate().alpha(0f).setDuration(200).withEndAction { shareButton.visibility = View.GONE }.start()
+            }
+        }
+        @android.webkit.JavascriptInterface
+        fun onVideoPaused() {
+            handler.post {
+                castButton.visibility = View.VISIBLE; castButton.animate().alpha(1f).setDuration(300).start()
+                shareButton.visibility = View.VISIBLE; shareButton.animate().alpha(1f).setDuration(300).start()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -85,6 +102,8 @@ class MainActivity : AppCompatActivity() {
         s.allowFileAccess = true
         s.allowContentAccess = true
         s.userAgentString = "Mozilla/5.0 (Linux; Android 11; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+        webView.addJavascriptInterface(VideoStateInterface(), "Android")
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
@@ -154,6 +173,13 @@ class MainActivity : AppCompatActivity() {
                                 obs.observe(document.body, {childList:true, subtree:true});
                             }
                             addFsBtn();
+                            var video=document.querySelector('video');
+                            if(video){
+                                video.addEventListener('play',function(){Android.onVideoPlaying();});
+                                video.addEventListener('pause',function(){Android.onVideoPaused();});
+                                video.addEventListener('ended',function(){Android.onVideoPaused();});
+                                if(!video.paused)Android.onVideoPlaying();
+                            }
                         } catch(e){}
                     })();
                 """.trimIndent(), null)
