@@ -4,7 +4,10 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Play triangle in brand cyan -->
     <path
         android:fillColor="#64D2FF"
-        android:pathData="M34,38h40v4H34zM34,46h40v4H34zM34,54h40v4H34zM34,62h40v4H34zM30,34h4v36h-4zM74,34h4v36h-4zM40,34 h28v4H40zM40,66h28v4H40z" />
+        android:pathData="M38,32 L38,76 L76,54 Z"
+        android:strokeWidth="2"
+        android:strokeColor="#88E0FF" />
 </vector>
