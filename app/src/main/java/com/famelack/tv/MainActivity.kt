@@ -66,7 +66,6 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        webView.setBackgroundColor(Color.TRANSPARENT)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
@@ -302,9 +301,13 @@ class MainActivity : AppCompatActivity() {
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> { webView.scrollBy(150, 0); return true }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                webView.evaluateJavascript("(function(){var v=document.querySelector('video');if(v&&!v.paused){try{v.webkitEnterFullscreen();}catch(e){}try{v.requestFullscreen();}catch(e){}return'fs';}return'no';})()", null)
                 injectClick(); return true
             }
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { injectVideoClick(); return true }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                webView.evaluateJavascript("(function(){var v=document.querySelector('video');if(v&&!v.paused){try{v.webkitEnterFullscreen();}catch(e){}try{v.requestFullscreen();}catch(e){}return'fs';}return'no';})()", null)
+                injectVideoClick(); return true
+            }
             KeyEvent.KEYCODE_BACK -> {
                 if (customView != null) { hideCustomView() }
                 else if (webView.canGoBack()) { webView.goBack() }
