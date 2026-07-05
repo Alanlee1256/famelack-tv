@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.setBackgroundColor(Color.BLACK)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
@@ -287,7 +288,6 @@ class MainActivity : AppCompatActivity() {
         val ctrl = WindowCompat.getInsetsController(window, window.decorView)
         ctrl.hide(WindowInsetsCompat.Type.systemBars())
         ctrl.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -295,11 +295,14 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_UP -> { webView.scrollBy(0, -150); return true }
             KeyEvent.KEYCODE_DPAD_DOWN -> { webView.scrollBy(0, 150); return true }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (shareButton.hasFocus()) webView.requestFocus()
-                else webView.scrollBy(-150, 0)
+                if (shareButton.hasFocus()) { webView.requestFocus(); return true }
+                webView.evaluateJavascript("(function(){var f=Array.from(document.querySelectorAll('button,a,input,select,textarea,video,[tabindex]:not([tabindex=\"-1\"])')).filter(function(e){return e.offsetParent!==null});var i=f.indexOf(document.activeElement);if(i>0)f[i-1].focus();})()", null)
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> { webView.scrollBy(150, 0); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                webView.evaluateJavascript("(function(){var f=Array.from(document.querySelectorAll('button,a,input,select,textarea,video,[tabindex]:not([tabindex=\"-1\"])')).filter(function(e){return e.offsetParent!==null});var i=f.indexOf(document.activeElement);if(i<f.length-1)f[i+1].focus();})()", null)
+                return true
+            }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                 webView.evaluateJavascript("(function(){var v=document.querySelector('video');if(v&&!v.paused){try{v.webkitEnterFullscreen();}catch(e){}try{v.requestFullscreen();}catch(e){}return'fs';}return'no';})()", null)
                 injectClick(); return true
