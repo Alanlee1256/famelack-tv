@@ -2,7 +2,6 @@ package com.famelack.tv
 
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -20,7 +19,6 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.AppCompatButton
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -36,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var splashView: FrameLayout
     private lateinit var rootLayout: FrameLayout
-    private lateinit var shareButton: AppCompatButton
     private lateinit var fullscreenContainer: FrameLayout
 
     private val handler = Handler(Looper.getMainLooper())
@@ -52,14 +49,14 @@ class MainActivity : AppCompatActivity() {
         fun onVideoPlaying() {
             handler.post {
                 castButton.animate().alpha(0f).setDuration(200).withEndAction { castButton.visibility = View.GONE }.start()
-                shareButton.animate().alpha(0f).setDuration(200).withEndAction { shareButton.visibility = View.GONE }.start()
+                webView.evaluateJavascript("(function(){var v=document.querySelector('video');if(v){try{v.webkitEnterFullscreen();}catch(e){}try{v.requestFullscreen();}catch(e){}var s=document.getElementById('__ftv_fs_style');if(!s){s=document.createElement('style');s.id='__ftv_fs_style';s.textContent='video{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:999999!important;background:#000!important;object-fit:contain!important}';document.head.appendChild(s);}}})()", null)
             }
         }
         @android.webkit.JavascriptInterface
         fun onVideoPaused() {
             handler.post {
                 castButton.visibility = View.VISIBLE; castButton.animate().alpha(1f).setDuration(300).start()
-                shareButton.visibility = View.VISIBLE; shareButton.animate().alpha(1f).setDuration(300).start()
+                webView.evaluateJavascript("(function(){var s=document.getElementById('__ftv_fs_style');if(s)s.remove();})()", null)
             }
         }
     }
@@ -73,7 +70,6 @@ class MainActivity : AppCompatActivity() {
         splashView = findViewById(R.id.splash_view)
 
         setupWebView()
-        setupShareButton()
         setupImmersiveMode()
         setupCastButton()
 
@@ -116,7 +112,6 @@ class MainActivity : AppCompatActivity() {
                     fullscreenContainer.visibility = View.VISIBLE
                     fullscreenContainer.bringToFront()
                     webView.visibility = View.GONE
-                    shareButton.visibility = View.GONE
                 }
                 customView = view
                 customViewCallback = callback
@@ -127,7 +122,6 @@ class MainActivity : AppCompatActivity() {
                 customView?.let { (it.parent as? ViewGroup)?.removeView(it) }
                 fullscreenContainer.visibility = View.GONE
                 webView.visibility = View.VISIBLE
-                shareButton.visibility = View.VISIBLE
                 customView = null
                 customViewCallback?.onCustomViewHidden()
                 customViewCallback = null
@@ -138,10 +132,6 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                ObjectAnimator.ofFloat(shareButton, "alpha", shareButton.alpha, 0f).apply {
-                    duration = 200
-                    start()
-                }
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -208,41 +198,7 @@ class MainActivity : AppCompatActivity() {
         }
         handler.postDelayed({
             splashView.visibility = View.GONE
-            handler.postDelayed({
-                shareButton.visibility = View.VISIBLE
-                ObjectAnimator.ofFloat(shareButton, "alpha", 0f, 1f).apply {
-                    duration = 300
-                    start()
-                }
-            }, 1000)
         }, 500)
-    }
-
-    private fun setupShareButton() {
-        val d = resources.displayMetrics.density
-        val size = (56 * d).toInt()
-        val margin = (16 * d).toInt()
-
-        shareButton = AppCompatButton(this).apply {
-            text = "Send to TV"
-            setBackgroundColor(Color.parseColor("#664DABFF"))
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            isFocusable = true
-            isFocusableInTouchMode = true
-            layoutParams = FrameLayout.LayoutParams(size, size).apply {
-                gravity = Gravity.BOTTOM or Gravity.END
-                setMargins(margin, margin, margin, margin)
-            }
-            visibility = View.INVISIBLE
-            alpha = 0f
-            setOnClickListener { shareCurrentUrl() }
-            setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
-                else animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-            }
-        }
-        rootLayout.addView(shareButton)
     }
 
     private fun setupCastButton() {
@@ -280,36 +236,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun shareCurrentUrl() {
-        webView.evaluateJavascript("""
-            (function(){
-                try {
-                    if(window.videojs){
-                        var players=document.querySelectorAll('.video-js');
-                        for(var i=0;i<players.length;i++){
-                            var p=players[i];
-                            if(p.player){ var src=p.player.currentSrc()||p.player.src(); if(src) return src; }
-                        }
-                    }
-                    var v=document.querySelector('video');
-                    if(v) return v.currentSrc||v.src||'';
-                    var sources=document.querySelectorAll('video source');
-                    for(var i=0;i<sources.length;i++){ if(sources[i].src) return sources[i].src; }
-                } catch(e){}
-                return '';
-            })();
-        """.trimIndent()) { result ->
-            val videoUrl = result?.trim('"')?.trim('\'') ?: ""
-            val shareUrl = videoUrl.ifBlank { webView.url ?: "https://famelack.com/tv/uk" }
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, shareUrl)
-                putExtra(Intent.EXTRA_SUBJECT, "Famelack TV")
-            }
-            startActivity(Intent.createChooser(shareIntent, "Send to TV"))
-        }
-    }
-
     private fun setupImmersiveMode() {
         val ctrl = WindowCompat.getInsetsController(window, window.decorView)
         ctrl.hide(WindowInsetsCompat.Type.systemBars())
@@ -321,7 +247,6 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_UP -> { webView.scrollBy(0, -150); return true }
             KeyEvent.KEYCODE_DPAD_DOWN -> { webView.scrollBy(0, 150); return true }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                if (shareButton.hasFocus()) { webView.requestFocus(); return true }
                 webView.evaluateJavascript("(function(){var f=Array.from(document.querySelectorAll('button,a,input,select,textarea,video,[tabindex]:not([tabindex=\"-1\"])')).filter(function(e){return e.offsetParent!==null});var i=f.indexOf(document.activeElement);if(i>0)f[i-1].focus();})()", null)
                 return true
             }
@@ -351,7 +276,6 @@ class MainActivity : AppCompatActivity() {
         customView?.let { (it.parent as? ViewGroup)?.removeView(it) }
         fullscreenContainer.visibility = View.GONE
         webView.visibility = View.VISIBLE
-        shareButton.visibility = View.VISIBLE
         customView = null
         customViewCallback?.onCustomViewHidden()
         customViewCallback = null
