@@ -53,15 +53,6 @@ class MainActivity : AppCompatActivity() {
         get() = prefs.getBoolean("use_external_player", false)
         set(value) = prefs.edit().putBoolean("use_external_player", value).apply()
 
-    // Screen size mode: 0=Fill(stretch), 1=Fit(aspect ratio), 2=Crop(zoom to fill)
-    private val SCREEN_MODE_FILL = 0
-    private val SCREEN_MODE_FIT = 1
-    private val SCREEN_MODE_CROP = 2
-    private val screenModeLabels = arrayOf("FILL", "FIT", "CROP")
-    private var screenModeIndex: Int
-        get() = prefs.getInt("screen_mode", SCREEN_MODE_FILL)
-        set(value) = prefs.edit().putInt("screen_mode", value).apply()
-
     private inner class VideoStateInterface {
         @android.webkit.JavascriptInterface
         fun onVideoPlaying() {
@@ -80,10 +71,9 @@ class MainActivity : AppCompatActivity() {
                         }
                     )
                 } else {
-                    // Internal player mode — hide cast button, click ⛶ button to trigger native fullscreen,
-                    // and inject CSS with current screen mode so inline video fills the screen
+                    // Internal player mode — hide cast button, click ⛶ button to trigger native
+                    // fullscreen, and inject CSS so video fills the screen
                     castButton.animate().alpha(0f).setDuration(200).withEndAction { castButton.visibility = View.GONE }.start()
-                    val fit = when (screenModeIndex) { SCREEN_MODE_FIT -> "contain"; SCREEN_MODE_CROP -> "cover"; else -> "fill" }
                     webView.evaluateJavascript(
                         "(function(){" +
                         "var b=document.getElementById('__ftv_fs_btn');if(b)b.click();" +
@@ -91,7 +81,7 @@ class MainActivity : AppCompatActivity() {
                         "if(!s){" +
                         "s=document.createElement('style');" +
                         "s.id='__ftv_fs_style';" +
-                        "s.textContent='video{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:999999!important;background:#000!important;object-fit:$fit!important}';" +
+                        "s.textContent='video{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:999999!important;background:#000!important;object-fit:fill!important}';" +
                         "document.head.appendChild(s);" +
                         "}})()", null
                     )
@@ -129,34 +119,6 @@ class MainActivity : AppCompatActivity() {
         @android.webkit.JavascriptInterface
         fun getPlayerMode(): String {
             return if (useExternalPlayer) "external" else "internal"
-        }
-
-        @android.webkit.JavascriptInterface
-        fun cycleScreenMode() {
-            handler.post {
-                var idx = screenModeIndex + 1
-                if (idx > SCREEN_MODE_CROP) idx = SCREEN_MODE_FILL
-                screenModeIndex = idx
-                val label = screenModeLabels[idx]
-                Toast.makeText(this@MainActivity, "Screen: $label", Toast.LENGTH_SHORT).show()
-                // Update the screen mode button text via JS
-                webView.evaluateJavascript(
-                    "(function(){" +
-                    "var b=document.getElementById('__ftv_sm_btn');" +
-                    "if(b)b.textContent='$label';" +
-                    "var s=document.getElementById('__ftv_fs_style');" +
-                    "if(s){var fit='${when(idx){SCREEN_MODE_FIT->"contain";SCREEN_MODE_CROP->"cover";else->"fill"}}';" +
-                    "s.textContent='video{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:999999!important;background:#000!important;object-fit:'+fit+'!important}';}" +
-                    "})()", null
-                )
-                // Also update the custom view scale if in fullscreen
-                handler.postDelayed({ updateCustomViewScale() }, 100)
-            }
-        }
-
-        @android.webkit.JavascriptInterface
-        fun getScreenMode(): String {
-            return screenModeLabels[screenModeIndex]
         }
     }
 
@@ -212,8 +174,6 @@ class MainActivity : AppCompatActivity() {
                     fullscreenContainer.visibility = View.VISIBLE
                     fullscreenContainer.bringToFront()
                     webView.visibility = View.GONE
-                    // Apply screen mode scaling to the custom video view
-                    handler.postDelayed({ updateCustomViewScale() }, 200)
                 }
                 customView = view
                 customViewCallback = callback
@@ -259,22 +219,6 @@ class MainActivity : AppCompatActivity() {
                                 var mode = Android.getPlayerMode();
                                 tb.textContent = mode === 'external' ? 'VLC' : 'WEB';
                             }
-
-                            // --- Screen size mode button (right side, above fullscreen) ---
-                            function addSmBtn() {
-                                if(document.getElementById('__ftv_sm_btn')) return;
-                                var smBtn = document.createElement('div');
-                                smBtn.id = '__ftv_sm_btn';
-                                var initialMode = Android.getScreenMode();
-                                smBtn.textContent = initialMode || 'FILL';
-                                smBtn.style.cssText = 'position:fixed;bottom:140px;right:16px;z-index:99999;width:48px;height:36px;border-radius:6px;background:rgba(0,0,0,0.5);color:#fff;font-size:11px;font-weight:bold;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid rgba(255,255,255,0.3);letter-spacing:0.5px;';
-                                smBtn.onclick = function(e){
-                                    e.stopPropagation();
-                                    Android.cycleScreenMode();
-                                };
-                                document.body.appendChild(smBtn);
-                            }
-                            addSmBtn();
 
                             // --- Fullscreen button ---
                             function addFsBtn() {
@@ -334,9 +278,6 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(Uri.parse(videoUrl), "video/*")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                // Pass aspect ratio hint — VLC respects this
-                val ar = when (screenModeIndex) { SCREEN_MODE_FILL -> "fill"; SCREEN_MODE_CROP -> "16:9"; else -> "original" }
-                putExtra("aspectRatio", ar)
                 // Try VLC specifically if installed
                 setPackage("org.videolan.vlc")
             }
@@ -479,35 +420,6 @@ class MainActivity : AppCompatActivity() {
                 if(el&&(el.tagName==='BUTTON'||el.tagName==='A'||el.tagName==='INPUT'||el.tagName==='VIDEO')) el.click();
             })();
         """.trimIndent(), null)
-    }
-
-    private fun updateCustomViewScale() {
-        val view = customView ?: return
-        when (screenModeIndex) {
-            SCREEN_MODE_FILL -> {
-                view.scaleX = 1.0f
-                view.scaleY = 1.0f
-                view.layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            }
-            SCREEN_MODE_FIT -> {
-                view.scaleX = 1.0f
-                view.scaleY = 1.0f
-                view.layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            }
-            SCREEN_MODE_CROP -> {
-                // Slight zoom (1.1x) to crop letterbox bars
-                view.scaleX = 1.1f
-                view.scaleY = 1.1f
-                view.layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            }
-        }
-        view.requestLayout()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
