@@ -65,7 +65,8 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webView.setBackgroundColor(Color.TRANSPARENT)
         webView.overScrollMode = View.OVER_SCROLL_NEVER
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled = false
@@ -292,14 +293,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> { webView.scrollBy(0, -60); return true }
-            KeyEvent.KEYCODE_DPAD_DOWN -> { webView.scrollBy(0, 60); return true }
+            KeyEvent.KEYCODE_DPAD_UP -> { webView.scrollBy(0, -150); return true }
+            KeyEvent.KEYCODE_DPAD_DOWN -> { webView.scrollBy(0, 150); return true }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (shareButton.hasFocus()) webView.requestFocus()
-                else webView.scrollBy(-60, 0)
+                else webView.scrollBy(-150, 0)
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> { webView.scrollBy(60, 0); return true }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> { webView.scrollBy(150, 0); return true }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                 injectClick(); return true
             }
